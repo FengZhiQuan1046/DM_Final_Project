@@ -114,9 +114,10 @@ if __name__ == '__main__':
         paragraphs = re.split(r'[\n]', text)
         paragraphs = [each for each in paragraphs if len(each) >= 5]
         paragraph_num = len(paragraphs)
+        max_mark_patterns_len = max([len(each) for each in text.split('q')])
         stop_rate = text.count('.')/(text.count('.') + text.count('!') + text.count('?')+1)
         groups_dicts.append({'id': id, 'words_count': words_count, 'remove_amount': remove_amount, 'copy_amount': copy_amount, 'average_sentence_len': average_sentence_len, 
                                 'paragraph_num':paragraph_num, 'edit_time': edit_time, 'audio_time': audio_time, 'media_time': media_time, 
-                                'stop_rate': stop_rate, 'text': text, 'label':label})
+                                'stop_rate': stop_rate, 'max_mark_patterns_len': max_mark_patterns_len, 'text': text, 'label':label})
         with open('./dataset/features.json', 'w') as f:
             json.dump(groups_dicts, f)
