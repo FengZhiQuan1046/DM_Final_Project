@@ -5,6 +5,7 @@ from argparse import ArgumentParser, Namespace
 from configparser import ConfigParser
 from tools import *
 import optuna
+from lightgbm import LGBMRegressor
 from params import init_params
 from data.data4regressor import Data4Regressor
 import pickle as pkl
@@ -31,18 +32,11 @@ if __name__ == "__main__":
     checkpoint_save_dir = f"{p['checkpoints_root']}/{p['version']}"
     if not os.path.exists(checkpoint_save_dir):
         os.mkdir(checkpoint_save_dir)
-    else:
-        for each in os.listdir(checkpoint_save_dir):
-            os.remove(os.path.join(checkpoint_save_dir, each))
-        # os.rmdir(checkpoint_save_dir)
-        # os.mkdir(checkpoint_save_dir)
     trial_counter = 0
     configs_counter = 0
     min_rmse = 10.
     def opt(trial):
         global min_rmse, configs_counter, trial_counter
-        logger.info(msg=f"Trial {trial_counter+1}")
-
         optim_params = {
             "iterations": 500, 
             "learning_rate": trial.suggest_float('lr', 0.01, 1.2, log=True), 
@@ -56,20 +50,6 @@ if __name__ == "__main__":
 
         for k in optim_params:
             model_params[k] = optim_params[k]
-
-        model_params["feature_weights"] = {
-                            'id': 1, 
-                            'words_count': trial.suggest_float("words_count", 0.01, 10.0, log=True), 
-                            'remove_amount': trial.suggest_float("remove_amount", 0.01, 10.0, log=True), 
-                            'copy_amount': trial.suggest_float("copy_amount", 0.01, 10.0, log=True), 
-                            'average_sentence_len': trial.suggest_float("average_sentence_len", 0.01, 10.0, log=True), 
-                            'paragraph_num':trial.suggest_float("paragraph_num", 0.01, 10.0, log=True), 
-                            'edit_time': trial.suggest_float("edit_time", 0.01, 10.0, log=True), 
-                            'audio_time': trial.suggest_float("audio_time", 0.01, 10.0, log=True), 
-                            'media_time': trial.suggest_float("media_time", 0.01, 10.0, log=True), 
-                            'stop_rate': trial.suggest_float("stop_rate", 0.01, 10.0, log=True), 
-                            'max_mark_patterns_len': trial.suggest_float("max_mark_patterns_len", 0.01, 10.0, log=True)
-                        }
 
         model = initialize_model(configs=model_configs, model_params=model_params)
         model, loss = train(model, train_set, val_set)

@@ -19,5 +19,5 @@ def init_params():
         'predictions_root' : os.path.join(output_root, "predictions"),
         'model_name' : configs.get(section="MODEL", option="model_name"),
         'dataset_dir' : configs.get(section="CODE", option="dataset_dir"),
-        'train_file' : os.path.join(dataset_dir, "features.json")
+        'train_file' : os.path.join(dataset_dir, "features.csv")
     }

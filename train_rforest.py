@@ -1,6 +1,6 @@
 from params import *
 import sys
-from model.catboost import initialize_model, train
+from model.catboost import initialize_model, train_rf
 from argparse import ArgumentParser, Namespace
 from configparser import ConfigParser
 from tools import *
@@ -8,6 +8,7 @@ import optuna
 from params import init_params
 from data.data4regressor import Data4Regressor
 import pickle as pkl
+from sklearn.ensemble import RandomForestRegressor
 
 if __name__ == "__main__":
     p = init_params()
@@ -23,7 +24,7 @@ if __name__ == "__main__":
     init_seeds()
 
     ds = Data4Regressor(p['train_file'])
-    train_set, val_set = ds.pack_to_catboost()
+    train_set, val_set = ds.split_xy()
     # model = initialize_model(model_configs)
     with open(os.path.join(p['config_dir'], f"{p['model_name']}.json"), 'r') as f:
         model_params = json.load(f)
@@ -31,48 +32,27 @@ if __name__ == "__main__":
     checkpoint_save_dir = f"{p['checkpoints_root']}/{p['version']}"
     if not os.path.exists(checkpoint_save_dir):
         os.mkdir(checkpoint_save_dir)
-    else:
-        for each in os.listdir(checkpoint_save_dir):
-            os.remove(os.path.join(checkpoint_save_dir, each))
-        # os.rmdir(checkpoint_save_dir)
-        # os.mkdir(checkpoint_save_dir)
     trial_counter = 0
     configs_counter = 0
     min_rmse = 10.
     def opt(trial):
         global min_rmse, configs_counter, trial_counter
-        logger.info(msg=f"Trial {trial_counter+1}")
-
         optim_params = {
-            "iterations": 500, 
-            "learning_rate": trial.suggest_float('lr', 0.01, 1.2, log=True), 
-            "depth": trial.suggest_int("depth", 5, 12, log=True), 
-            "l2_leaf_reg": trial.suggest_float("l2_leaf_reg", 0.5, 5.0, log=True), 
-            "loss_function": "RMSE", 
-            "random_seed": 114514, 
-            "random_strength": 1, 
-            "task_type": "GPU"
+            "max_depth" : trial.suggest_int('maxd', 12, 30, log=True), 
+            "min_samples_split" : trial.suggest_int('mss', 2, 5, log=True), 
+            "min_samples_leaf" : trial.suggest_int('msl', 8, 20, log=True), 
+            "min_weight_fraction_leaf" : trial.suggest_float('mwfl', 0.00001, 0.5, log=True), 
+            "max_leaf_nodes" : trial.suggest_int('mln', 8, 20, log=True), 
+            "min_impurity_decrease" : trial.suggest_float('mid', 0.0000001, 1.0, log=True), 
+            "n_jobs" : 16, 
+            "verbose" : trial.suggest_float('vb', 0.0000001, 1.0, log=True)
         }
 
         for k in optim_params:
             model_params[k] = optim_params[k]
 
-        model_params["feature_weights"] = {
-                            'id': 1, 
-                            'words_count': trial.suggest_float("words_count", 0.01, 10.0, log=True), 
-                            'remove_amount': trial.suggest_float("remove_amount", 0.01, 10.0, log=True), 
-                            'copy_amount': trial.suggest_float("copy_amount", 0.01, 10.0, log=True), 
-                            'average_sentence_len': trial.suggest_float("average_sentence_len", 0.01, 10.0, log=True), 
-                            'paragraph_num':trial.suggest_float("paragraph_num", 0.01, 10.0, log=True), 
-                            'edit_time': trial.suggest_float("edit_time", 0.01, 10.0, log=True), 
-                            'audio_time': trial.suggest_float("audio_time", 0.01, 10.0, log=True), 
-                            'media_time': trial.suggest_float("media_time", 0.01, 10.0, log=True), 
-                            'stop_rate': trial.suggest_float("stop_rate", 0.01, 10.0, log=True), 
-                            'max_mark_patterns_len': trial.suggest_float("max_mark_patterns_len", 0.01, 10.0, log=True)
-                        }
-
         model = initialize_model(configs=model_configs, model_params=model_params)
-        model, loss = train(model, train_set, val_set)
+        model, loss = train_rf(model, train_set, val_set)
         trial_counter += 1
         # logger.info(msg=f"================================>>>>>  loss: {loss} <<<<<================================")
         # print(loss)
